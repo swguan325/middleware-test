@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="DEN_USERS_OTP">
+
+	<insert id="insertOtp">
+	INSERT INTO DEN_USERS_OTP
+		(	EMAIL
+			, OTP
+			, IS_AUTH
+		)
+		VALUES
+		(	#{email}
+			, #{otp}
+			, false
+		)
+		ON DUPLICATE KEY
+		UPDATE OTP = #{otp}
+			, IS_AUTH = false
+	</insert>
+	
+	<select id="selectOtpByEmail" resultType="swguan.middleware.user.vo.UserOtpResponseVO">
+	SELECT
+		U.OTP AS otp
+	FROM 
+		DEN_USERS_OTP U
+    WHERE
+    	U.EMAIL = #{email}
+    	AND U.IS_AUTH = false
+	</select>
+	
+	<update id="updateOtpByEmail">
+	UPDATE DEN_USERS_OTP
+	SET
+		IS_AUTH = true
+	WHERE
+		EMAIL = #{email}
+    	AND IS_AUTH = false
+	</update>
+	
+</mapper>

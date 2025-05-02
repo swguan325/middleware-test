@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="DEN_USERS">
+
+	<select id="selectUserByEmail" resultType="swguan.middleware.user.vo.UserResponseVO">
+	SELECT
+		U.SEQ_NBR AS seqNbr,
+		U.PSWD AS pswd,
+		U.EMAIL AS email,
+		U.IS_OPEN AS isOpen
+	FROM 
+		DEN_USERS U
+    WHERE
+    	U.EMAIL = #{email}
+	</select>
+	
+	<insert id="insertUser">
+	INSERT INTO DEN_USERS
+		(	EMAIL
+			, PSWD
+		)
+		VALUES
+		(	#{email}
+			, #{pswd}
+		)
+		<selectKey keyProperty="seqNbr" order="AFTER" resultType="int">
+            SELECT last_insert_id()
+        </selectKey>
+	</insert>
+	
+	<select id="selectUserBySeqNbr" resultType="swguan.middleware.user.vo.UserResponseVO">
+	SELECT
+		U.SEQ_NBR AS seqNbr,
+		U.PSWD AS pswd,
+		U.EMAIL AS email,
+		U.IS_OPEN AS isOpen
+	FROM 
+		DEN_USERS U
+    WHERE
+    	U.SEQ_NBR = #{seqNbr}
+	</select>
+	
+	<update id="updateUserBySeqNbr">
+	UPDATE DEN_USERS
+	SET
+		IS_OPEN = true
+	WHERE
+		SEQ_NBR = #{seqNbr}
+	</update>
+	
+</mapper>

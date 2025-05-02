@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="DEN_USERS_LOGIN">
+
+	<insert id="insertLogin" parameterType="String">
+	INSERT INTO DEN_USERS_LOGIN
+		(	EMAIL
+			, PSWD_AUTH_DT
+		)
+		VALUES
+		(	#{email}
+			, now()
+		)
+		<selectKey keyProperty="seqNbr" order="AFTER" resultType="int">
+            SELECT last_insert_id()
+        </selectKey>
+	</insert>
+	
+	<update id="updateLoginBySeqNbr">
+	UPDATE DEN_USERS_LOGIN
+	SET
+		EMAIL_AUTH_DT = now()
+	WHERE
+		SEQ_NBR = #{seqNbr}
+	</update>
+	
+	<select id="selectLoginByEmail" resultType="swguan.middleware.user.vo.UserLoginResponseVO">
+	SELECT
+		L.SEQ_NBR AS seqNbr,
+		DATE_FORMAT(L.PSWD_AUTH_DT, '%Y/%m/%d %H:%i:%s') AS pswdAuthDt,
+		DATE_FORMAT(L.EMAIL_AUTH_DT, '%Y/%m/%d %H:%i:%s') AS emailAuthDt
+	FROM 
+		DEN_USERS_LOGIN L
+    WHERE
+    	L.EMAIL = #{email}
+    ORDER BY SEQ_NBR DESC
+    LIMIT 1
+	</select>
+	
+</mapper>
