@@ -26,7 +26,6 @@ import swguan.middleware.util.UidUtil;
 public class FirstFilter implements Filter {
 
 	public static final int DEFAULT_ORDER = Integer.MIN_VALUE;
-    public static final String REQ_UID_ATTR = "swguan.middleware.support.uid";
     public static final String MDC_UID_NODE = "uid";
 
 	private final Set<String> excludeUri = new HashSet<>(Arrays.asList("/v1/actuator/alive"));
@@ -36,7 +35,6 @@ public class FirstFilter implements Filter {
 			throws IOException, ServletException {
 
 		final String guid = UidUtil.getTimeUuid();
-		request.setAttribute(REQ_UID_ATTR, guid);
 		MDC.put(MDC_UID_NODE, guid);
 
 		final boolean nologRequestInfo = excludeUri.contains(((HttpServletRequest) request).getRequestURI());
