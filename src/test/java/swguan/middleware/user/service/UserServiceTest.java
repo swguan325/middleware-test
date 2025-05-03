@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -21,10 +22,15 @@ import swguan.middleware.support.header.HeaderTokenDTO;
 import swguan.middleware.user.dto.UserAuthRequestDTO;
 import swguan.middleware.user.dto.UserLoginResponseDTO;
 import swguan.middleware.user.dto.UserRequestDTO;
+import swguan.middleware.user.dto.UserResponseDTO;
+import swguan.middleware.user.repository.MailjetOtpRepository;
 import swguan.middleware.user.vo.UserLoginResponseVO;
+import swguan.middleware.user.vo.UserOtpResponseVO;
 import swguan.middleware.user.vo.UserResponseVO;
 import swguan.middleware.user.vo.dao.UserDAO;
 import swguan.middleware.user.vo.dao.UserLoginDAO;
+import swguan.middleware.user.vo.dao.UserOtpDAO;
+import swguan.middleware.util.JwtTokenUtil;
 
 @Slf4j
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +45,15 @@ public class UserServiceTest {
 
 	@Mock
 	private UserLoginDAO userLoginDAO;
+
+	@Mock
+	private UserOtpDAO userOtpDAO;
+
+	@Mock
+	private MailjetOtpRepository mailjetOtpRepository;
+
+	@Mock
+	private JwtTokenUtil jwtTokenUtil;
 
 	@Test
 	public void insertUser_NormalCase() throws FlowException {
@@ -62,7 +77,7 @@ public class UserServiceTest {
 	}
 
 	@Test
-	public void insertUser_ErrorCase() {
+	public void insertUser_ErrorCase_Email() {
 		log.debug("=== insertUser_ErrorCase_Email ===");
 
 		UserRequestDTO reqDto = new UserRequestDTO();
@@ -83,18 +98,47 @@ public class UserServiceTest {
 	}
 
 	@Test
-	public void selectUser_ErrorCase_PASSWORD() throws Exception {
-		log.debug("=== selectUser_ErrorCase ===");
+	public void selectUser_NormalCase() throws Exception {
+		log.debug("=== selectUser_NormalCase ===");
 
 		UserRequestDTO reqDto = new UserRequestDTO();
 		reqDto.setEmail("abc@gmail.com");
 		reqDto.setPswd("pswd");
 
-		UserResponseVO reqVo = new UserResponseVO();
-		reqVo.setEmail(reqDto.getEmail());
-		reqVo.setPswd("asdw");
+		UserResponseVO resVo = new UserResponseVO();
+		resVo.setEmail(reqDto.getEmail());
+		resVo.setPswd(DigestUtils.sha512Hex(reqDto.getPswd()));
+		resVo.setIsOpen(true);
 
-		when(userDAO.selectUserByEmail(ArgumentMatchers.any())).thenReturn(reqVo);
+		when(userDAO.selectUserByEmail(ArgumentMatchers.any())).thenReturn(resVo);
+		when(jwtTokenUtil.generateToken(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn("jwtToken");
+
+		final FlowException expectedException = new FlowException(ResponseCode.EMAIL_NOT_AUTH);
+		FlowException actualException = null;
+		try {
+			userService.selectUser(reqDto);
+		} catch (final FlowException e) {
+			actualException = e;
+		}
+		assertEquals(actualException.getCode(), expectedException.getCode());
+		assertEquals(((UserResponseDTO) actualException.getErrorContent()).getToken(), "jwtToken");
+
+		log.debug("=== cdoe: {}, message: {} ===", actualException.getCode(), actualException.getMessage());
+	}
+
+	@Test
+	public void selectUser_ErrorCase_PASSWORD() throws Exception {
+		log.debug("=== selectUser_ErrorCase_PASSWORD ===");
+
+		UserRequestDTO reqDto = new UserRequestDTO();
+		reqDto.setEmail("abc@gmail.com");
+		reqDto.setPswd("pswd");
+
+		UserResponseVO resVo = new UserResponseVO();
+		resVo.setEmail(reqDto.getEmail());
+		resVo.setPswd("asdw");
+
+		when(userDAO.selectUserByEmail(ArgumentMatchers.any())).thenReturn(resVo);
 
 		final FlowException expectedException = new FlowException(ResponseCode.PSWD_NOT_MATCH);
 		FlowException actualException = null;
@@ -106,6 +150,33 @@ public class UserServiceTest {
 		assertEquals(actualException.getCode(), expectedException.getCode());
 
 		log.debug("=== cdoe: {}, message: {} ===", actualException.getCode(), actualException.getMessage());
+	}
+
+	@Test
+	public void authUser_NormalCase() throws FlowException {
+		log.debug("=== authUser_NormalCase ===");
+
+		final UserAuthRequestDTO reqDto = new UserAuthRequestDTO();
+		reqDto.setOtp("123456");
+
+		final HeaderTokenDTO headerTokenDTO = new HeaderTokenDTO();
+		headerTokenDTO.setUserSeqNbr(1);
+		headerTokenDTO.setLoginSeqNbr(99);
+
+		final UserResponseVO resVo = new UserResponseVO();
+		resVo.setEmail("abc@gmail.com");
+		resVo.setIsOpen(true);
+
+		final UserOtpResponseVO resOtpVo = new UserOtpResponseVO();
+		resOtpVo.setOtp("123456");
+
+		when(userDAO.selectUserBySeqNbr(ArgumentMatchers.anyInt())).thenReturn(resVo);
+		when(userOtpDAO.selectOtpByEmail(ArgumentMatchers.any())).thenReturn(resOtpVo);
+
+		userService.authUser(headerTokenDTO, reqDto);
+
+		verify(userLoginDAO, new Times(1)).updateLoginBySeqNbr(ArgumentMatchers.anyInt());
+		verify(userDAO, new Times(0)).updateUserBySeqNbr(ArgumentMatchers.anyInt());
 	}
 
 	@Test
@@ -148,6 +219,31 @@ public class UserServiceTest {
 		assertEquals(actual.getEmailAuthDt(), expected.getEmailAuthDt());
 
 		log.debug("=== actual: {} ===", actual);
+	}
+
+	@Test
+	public void getLastLogin_ErrorCase_LOGIN() throws FlowException {
+		log.debug("=== getLastLogin_ErrorCase_LOGIN ===");
+
+		final HeaderTokenDTO headerTokenDTO = new HeaderTokenDTO();
+		headerTokenDTO.setUserSeqNbr(1);
+		headerTokenDTO.setLoginSeqNbr(99);
+
+		final UserResponseVO resVo = new UserResponseVO();
+		resVo.setEmail("abc@gmail.com");
+
+		when(userDAO.selectUserBySeqNbr(ArgumentMatchers.anyInt())).thenReturn(resVo);
+
+		final FlowException expectedException = new FlowException(ResponseCode.LOGIN_NOT_FOUND);
+		FlowException actualException = null;
+		try {
+			userService.getLastLogin(headerTokenDTO);
+		} catch (final FlowException e) {
+			actualException = e;
+		}
+		assertEquals(actualException.getCode(), expectedException.getCode());
+
+		log.debug("=== cdoe: {}, message: {} ===", actualException.getCode(), actualException.getMessage());
 	}
 
 }
